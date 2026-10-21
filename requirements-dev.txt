@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest
+pytest-django
+factory-boy
+coverage
+ruff
+pre-commit
