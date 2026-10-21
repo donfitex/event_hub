@@ -85,6 +85,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+AUTH_USER_MODEL = "users.User"
+FRONTEND_URL = env("FRONTEND_URL", "http://localhost:3000")
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Lagos"
 USE_I18N = True
@@ -105,10 +108,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
-    "DEFAULT_PAGINATION_CLASS": [ 
-        "rest_framework.pagination.PageNumberPagination",
-        "apps.common.pagination.StandardPagination",
-    ]
+    "DEFAULT_PAGINATION_CLASS": "apps.common.pagination.StandardPagination",
 }
 
 # Shared security settings
