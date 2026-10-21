@@ -3,7 +3,8 @@ __pycache__/
 *.pyc
 db.sqlite3
 .env
-media/
+media/*
+!media/.gitkeep
 staticfiles/
 .vscode/
 .idea/
