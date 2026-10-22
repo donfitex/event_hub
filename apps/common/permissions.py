@@ -11,3 +11,18 @@ class IsOwnerOrReadOnly(BasePermission):
             return True
         owner_field = getattr(view, "owner_field", self.owner_field)
         return getattr(obj, owner_field) == request.user
+    
+class IsOrganizerRole(BasePermission):
+    """Authenticated ORGANIZER or ADMIN."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_organizer)
+
+
+class IsAdminRole(BasePermission):
+    """Authenticated ADMIN only."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_admin_role)

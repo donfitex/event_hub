@@ -7,6 +7,28 @@ from django.utils.text import slugify
 
 from apps.common.models import TimeStampedModel
 
+class Category(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True, blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "categories"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.name)[:110] or "category"
+            slug, n = base, 2
+            while Category.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{n}"
+                n += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 class EventStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
@@ -23,6 +45,12 @@ class Event(TimeStampedModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="organized_events",
+    )
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.PROTECT,
+        related_name="events",
+        null=True,
     )
     location = models.CharField(max_length=200, help_text="City or area, e.g. Lagos")
     venue = models.CharField(max_length=200)
@@ -42,6 +70,7 @@ class Event(TimeStampedModel):
         indexes = [
             models.Index(fields=["status", "start_datetime"]),
             models.Index(fields=["organizer", "status"]),
+            models.Index(fields=["category", "start_datetime"]),
             models.Index(fields=["location"]),
             models.Index(fields=["start_datetime"]),
         ]
