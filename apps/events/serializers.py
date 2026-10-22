@@ -1,5 +1,9 @@
+import copy
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from .constants import EventStatus
 from .models import Category, Event
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -57,3 +61,40 @@ class EventDetailSerializer(_EventAvailabilityMixin, serializers.ModelSerializer
 
     def get_registration_available(self, obj):
         return obj.is_registration_open and self.get_available_seats(obj) > 0
+    
+class EventWriteSerializer(serializers.ModelSerializer):
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(is_active=True)
+    )
+    status = serializers.ChoiceField(choices=EventStatus.choices, required=False)
+
+    class Meta:
+        model = Event
+        fields = [
+            "title", "description", "category", "location", "venue",
+            "start_datetime", "end_datetime", "registration_deadline",
+            "capacity", "status", "image",
+        ]
+        extra_kwargs = {"image": {"required": False, "allow_null": True}}
+
+    def validate(self, attrs):
+        request = self.context["request"]
+
+        if self.instance is not None:
+            if self.instance.status in (EventStatus.CANCELLED, EventStatus.COMPLETED):
+                raise serializers.ValidationError(
+                    "Cancelled or completed events cannot be edited."
+                )
+            candidate = copy.copy(self.instance)
+        else:
+            candidate = Event(organizer=request.user, status=EventStatus.DRAFT)
+
+        for field, value in attrs.items():
+            setattr(candidate, field, value)
+
+        # Reuse the model rules from Commit 08 (dates, transitions, publishing).
+        try:
+            candidate.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict)
+        return attrs
