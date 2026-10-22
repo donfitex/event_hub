@@ -4,8 +4,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.common.permissions import IsAdminRole, IsOrganizerRole
-
-from django.db.models import Q
+from apps.registrations.constants import RegistrationStatus
+from django.db.models import Count, Q
 
 from .constants import EventStatus
 from .filters import EventFilter
@@ -55,7 +55,12 @@ class EventViewSet(viewsets.ModelViewSet):
     ordering = ["start_datetime"]
 
     def get_queryset(self):
-        qs = Event.objects.select_related("category", "organizer")
+        qs = Event.objects.select_related("category", "organizer").annotate(
+            registered_count=Count(
+                "registrations",
+                filter=Q(registrations__status=RegistrationStatus.REGISTERED),
+            )
+        )
         user = self.request.user
         if user.is_authenticated and user.is_admin_role:
             return qs
