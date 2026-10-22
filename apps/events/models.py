@@ -7,6 +7,18 @@ from django.utils.text import slugify
 
 from apps.common.models import TimeStampedModel
 
+from .constants import EventStatus
+from .validators import (
+    validate_capacity,
+    validate_description,
+    validate_event_dates,
+    validate_location,
+    validate_organizer_role,
+    validate_status_transition,
+    validate_title,
+    validate_venue,
+)
+
 class Category(TimeStampedModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
@@ -30,13 +42,12 @@ class Category(TimeStampedModel):
             self.slug = slug
         super().save(*args, **kwargs)
 
-class EventStatus(models.TextChoices):
-    DRAFT = "DRAFT", "Draft"
-    PUBLISHED = "PUBLISHED", "Published"
-    CANCELLED = "CANCELLED", "Cancelled"
-    COMPLETED = "COMPLETED", "Completed"
-
-
+def _check(errors, field, func, *args):
+    try:
+        func(*args)
+    except ValidationError as exc:
+        errors.setdefault(field, []).extend(exc.messages)
+        
 class Event(TimeStampedModel):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
@@ -94,16 +105,43 @@ class Event(TimeStampedModel):
 
     def clean(self):
         errors = {}
-        if self.start_datetime and self.end_datetime and self.end_datetime <= self.start_datetime:
-            errors["end_datetime"] = "End must be after start."
-        if (
-            self.start_datetime
-            and self.registration_deadline
-            and self.registration_deadline > self.start_datetime
-        ):
-            errors["registration_deadline"] = "Deadline cannot be after the event starts."
-        if self.capacity is not None and self.capacity < 1:
-            errors["capacity"] = "Capacity must be at least 1."
+        original = None
+        if self.pk:
+            original = (
+                Event.objects.filter(pk=self.pk).only("status", "start_datetime").first()
+            )
+
+        _check(errors, "title", validate_title, self.title)
+        _check(errors, "description", validate_description, self.description)
+        _check(errors, "location", validate_location, self.location)
+        _check(errors, "venue", validate_venue, self.venue)
+        _check(errors, "capacity", validate_capacity, self.capacity)
+
+        # Future-start rule applies to new events and when the start date changes.
+        start_changed = original is None or original.start_datetime != self.start_datetime
+        for field, message in validate_event_dates(
+            self.start_datetime,
+            self.end_datetime,
+            self.registration_deadline,
+            check_future=start_changed,
+        ).items():
+            errors.setdefault(field, []).append(message)
+
+        if self.organizer_id:
+            _check(errors, "organizer", validate_organizer_role, self.organizer)
+
+        if original and original.status != self.status:
+            _check(errors, "status", validate_status_transition, original.status, self.status)
+
+        publishing = self.status == EventStatus.PUBLISHED and (
+            original is None or original.status != EventStatus.PUBLISHED
+        )
+        if publishing:
+            if not self.category_id:
+                errors.setdefault("category", []).append("A category is required to publish.")
+            if self.start_datetime and self.start_datetime <= timezone.now():
+                errors.setdefault("status", []).append("Cannot publish an event that has already started.")
+
         if errors:
             raise ValidationError(errors)
 
