@@ -1,10 +1,14 @@
 from django.db.models import ProtectedError
 from rest_framework import status, viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from apps.common.permissions import IsAdminRole, IsOrganizerRole
 from apps.registrations.constants import RegistrationStatus
+from apps.registrations.exceptions import RegistrationError
+from apps.registrations.serializers import RegistrationSerializer
+from apps.registrations.services import register_for_event
 from django.db.models import Count, Q
 
 from .constants import EventStatus
@@ -74,6 +78,8 @@ class EventViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         if self.action == "create":
             return [IsOrganizerRole()]
+        if self.action == "register":
+            return [IsAuthenticated()]
         return [IsOrganizerRole(), IsEventManager()]
 
     def get_serializer_class(self):
@@ -81,6 +87,8 @@ class EventViewSet(viewsets.ModelViewSet):
             return EventWriteSerializer
         if self.action == "retrieve":
             return EventDetailSerializer
+        if self.action == "register":
+            return RegistrationSerializer
         return EventListSerializer
 
     def _detail(self, event):
@@ -109,3 +117,18 @@ class EventViewSet(viewsets.ModelViewSet):
             )
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=True, methods=["post"], url_path="register")
+    def register(self, request, pk=None):
+        event = self.get_object()  # drafts stay hidden from non-owners (404)
+        try:
+            registration = register_for_event(request.user, event)
+        except RegistrationError as exc:
+            return Response(
+                {"error": {"code": exc.code, "message": exc.message}},
+                status=exc.status_code,
+            )
+        data = RegistrationSerializer(
+            registration, context=self.get_serializer_context()
+        ).data
+        return Response(data, status=status.HTTP_201_CREATED)
