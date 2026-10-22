@@ -5,9 +5,12 @@ from rest_framework.response import Response
 
 from apps.common.permissions import IsAdminRole, IsOrganizerRole
 
-from .models import Category
-from .serializers import CategorySerializer
+from django.db.models import Q
 
+from .constants import EventStatus
+from .filters import EventFilter
+from .models import Category, Event
+from .serializers import CategorySerializer, EventDetailSerializer, EventListSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -37,3 +40,25 @@ class CategoryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class EventViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [AllowAny]
+    filterset_class = EventFilter
+    search_fields = ["title", "description", "venue", "location", "category__name"]
+    ordering_fields = ["start_datetime", "created_at", "title", "capacity"]
+    ordering = ["start_datetime"]
+
+    def get_queryset(self):
+        qs = Event.objects.select_related("category", "organizer")
+        user = self.request.user
+        if user.is_authenticated and user.is_admin_role:
+            return qs
+        visible = ~Q(status=EventStatus.DRAFT)
+        if user.is_authenticated and user.is_organizer:
+            visible |= Q(organizer=user)
+        return qs.filter(visible)
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return EventDetailSerializer
+        return EventListSerializer

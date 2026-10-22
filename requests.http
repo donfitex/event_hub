@@ -1,0 +1,8 @@
+   ### List
+   GET http://127.0.0.1:8000/api/v1/events/
+
+   ### Filtered
+   GET http://127.0.0.1:8000/api/v1/events/?category=technology&location=lagos&ordering=-start_datetime
+
+   ### Detail
+   GET http://127.0.0.1:8000/api/v1/events/1/
