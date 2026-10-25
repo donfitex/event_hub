@@ -116,6 +116,17 @@ class Event(TimeStampedModel):
         _check(errors, "location", validate_location, self.location)
         _check(errors, "venue", validate_venue, self.venue)
         _check(errors, "capacity", validate_capacity, self.capacity)
+        
+        if self.pk and self.capacity:
+            from apps.registrations.constants import RegistrationStatus
+
+            registered = self.registrations.filter(
+                status=RegistrationStatus.REGISTERED
+            ).count()
+            if self.capacity < registered:
+                errors.setdefault("capacity", []).append(
+                    f"Capacity cannot be lower than the {registered} current registrations."
+                )
 
         # Future-start rule applies to new events and when the start date changes.
         start_changed = original is None or original.start_datetime != self.start_datetime
