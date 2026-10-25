@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.events.constants import EventStatus
 from apps.events.models import Event
 
+from .constants import RegistrationStatus
 from .exceptions import RegistrationError
 from .models import Registration
 
@@ -45,3 +46,17 @@ def register_for_event(user, event):
     except IntegrityError:
         # Last line of defence: the partial unique constraint from Commit 11.
         raise RegistrationError("ALREADY_REGISTERED", "You are already registered for this event.", 409)
+
+@transaction.atomic
+def cancel_registration(registration):
+    """Cancel a registration. Extended with full rules in Commit 15."""
+    # Lock the row so two simultaneous cancel requests can't both succeed.
+    registration = Registration.objects.select_for_update().get(pk=registration.pk)
+
+    if registration.status == RegistrationStatus.CANCELLED:
+        raise RegistrationError("ALREADY_CANCELLED", "This registration is already cancelled.", 409)
+
+    registration.status = RegistrationStatus.CANCELLED
+    registration.cancelled_at = timezone.now()
+    registration.save(update_fields=["status", "cancelled_at", "updated_at"])
+    return registration
