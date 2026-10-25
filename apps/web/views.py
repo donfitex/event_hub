@@ -1,4 +1,3 @@
-from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login
 from django.core.paginator import Paginator
@@ -9,12 +8,20 @@ from django.utils.dateparse import parse_date
 from django.contrib.auth.views import LoginView, redirect_to_login
 from django.http import Http404
 from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import PasswordChangeView
+from django.contrib.messages.views import SuccessMessageMixin
+from django.urls import reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
+from rest_framework.authtoken.models import Token
 
 from apps.events.validators import user_can_manage_event
+from apps.registrations.constants import ACTIVE_STATUSES, RegistrationStatus
 from apps.registrations.exceptions import RegistrationError
 from apps.registrations.models import Registration
 from apps.registrations.services import (
     cancel_registration,
+    cancellation_deadline,
     get_waitlist_position,
     register_for_event,
 )
@@ -22,9 +29,9 @@ from apps.registrations.services import (
 from apps.events.availability import availability_state
 from apps.events.constants import EventStatus
 from apps.events.models import Category, Event
-from apps.registrations.constants import RegistrationStatus
 
-from .forms import LoginForm, RegisterForm
+
+from .forms import LoginForm, RegisterForm, ProfileForm
 
 PAGE_SIZE = 9
 SORTS = {
@@ -147,6 +154,91 @@ def event_detail(request, slug):
     }
     return render(request, "web/event_detail.html", context)
 
+def _registration_stats(user):
+    now = timezone.now()
+    return Registration.objects.filter(user=user).aggregate(
+        upcoming=Count("id", filter=Q(status=RegistrationStatus.REGISTERED, event__end_datetime__gt=now)),
+        waitlisted=Count("id", filter=Q(status=RegistrationStatus.WAITLISTED, event__end_datetime__gt=now)),
+        past=Count("id", filter=Q(status__in=ACTIVE_STATUSES, event__end_datetime__lte=now)),
+        cancelled=Count("id", filter=Q(status=RegistrationStatus.CANCELLED)),
+    )
+
+
+def _decorate_registrations(registrations):
+    now = timezone.now()
+    items = list(registrations)
+    for r in items:
+        r.can_cancel = r.is_active and now < cancellation_deadline(r.event)
+        r.waitlist_position = get_waitlist_position(r)
+        r.event_ended = r.event.end_datetime <= now
+    return items
+
+
+def _user_registrations(user):
+    return Registration.objects.filter(user=user).select_related(
+        "event", "event__category", "event__organizer"
+    )
+
+
+@login_required
+def dashboard(request):
+    now = timezone.now()
+    upcoming = (
+        _user_registrations(request.user)
+        .filter(status__in=ACTIVE_STATUSES, event__end_datetime__gt=now)
+        .order_by("event__start_datetime")[:3]
+    )
+    context = {
+        "stats": _registration_stats(request.user),
+        "next_up": _decorate_registrations(upcoming),
+    }
+    return render(request, "web/dashboard.html", context)
+
+
+@login_required
+def my_registrations(request):
+    now = timezone.now()
+    tab = request.GET.get("tab", "upcoming")
+    qs = _user_registrations(request.user)
+    if tab == "past":
+        qs = qs.filter(status__in=ACTIVE_STATUSES, event__end_datetime__lte=now).order_by("-event__start_datetime")
+    elif tab == "cancelled":
+        qs = qs.filter(status=RegistrationStatus.CANCELLED).order_by("-cancelled_at")
+    else:
+        tab = "upcoming"
+        qs = qs.filter(status__in=ACTIVE_STATUSES, event__end_datetime__gt=now).order_by("event__start_datetime")
+
+    page = Paginator(qs, 10).get_page(request.GET.get("page"))
+    context = {
+        "tab": tab,
+        "page": page,
+        "registrations": _decorate_registrations(page.object_list),
+        "stats": _registration_stats(request.user),
+        "querystring": f"tab={tab}",
+    }
+    return render(request, "web/my_registrations.html", context)
+
+
+@login_required
+def profile(request):
+    form = ProfileForm(request.POST or None, instance=request.user)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Your profile has been updated.")
+        return redirect("web:profile")
+    return render(request, "web/profile.html", {"form": form})
+
+
+class SitePasswordChangeView(SuccessMessageMixin, PasswordChangeView):
+    template_name = "web/password_change.html"
+    success_url = reverse_lazy("web:profile")
+    success_message = "Your password has been changed."
+
+    def form_valid(self, form):
+        # Same rule as the API: a new password invalidates old API tokens.
+        Token.objects.filter(user=self.request.user).delete()
+        return super().form_valid(form)
+
 
 @require_POST
 def event_register(request, slug):
@@ -185,6 +277,11 @@ def registration_cancel(request, pk):
             request,
             "You have left the waitlist." if was_waitlisted else "Your registration has been cancelled.",
         )
+    next_url = request.POST.get("next", "")
+    if url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return redirect(next_url)
     return redirect("web:event_detail", slug=registration.event.slug)
 
 def register(request):

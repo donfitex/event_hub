@@ -1,0 +1,36 @@
+<article class="reg-card">
+  <div class="reg-main">
+    <h3><a href="{% url 'web:event_detail' r.event.slug %}">{{ r.event.title }}</a></h3>
+    <p class="reg-meta">
+      📅 {{ r.event.start_datetime|date:"F j, Y" }} · {{ r.event.start_datetime|time:"g:i A" }}<br>
+      📍 {{ r.event.location }}
+    </p>
+    {% if r.status == "CANCELLED" %}
+      <span class="badge badge-cancelled">Cancelled</span>
+      <small class="muted">
+        {% if r.event.status == "CANCELLED" %}The organizer cancelled this event.
+        {% else %}Cancelled on {{ r.cancelled_at|date:"j M Y" }}.{% endif %}
+      </small>
+    {% elif r.status == "REGISTERED" %}
+      <span class="badge badge-registered">✓ Registered</span>
+      {% if r.event_ended %}<small class="muted">Event ended</small>{% endif %}
+    {% else %}
+      <span class="badge badge-waitlisted">
+        {% if r.event_ended %}Waitlisted (not promoted){% else %}Waitlisted · position {{ r.waitlist_position }}{% endif %}
+      </span>
+    {% endif %}
+  </div>
+  <div class="reg-actions">
+    <a class="btn btn-ghost" href="{% url 'web:event_detail' r.event.slug %}">View Details</a>
+    {% if r.can_cancel %}
+      <form method="post" action="{% url 'web:registration_cancel' r.pk %}"
+            onsubmit="return confirm('Are you sure?');">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn btn-danger" type="submit">
+          {% if r.status == "WAITLISTED" %}Leave waitlist{% else %}Cancel{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</article>

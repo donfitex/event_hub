@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}My registrations{% endblock %}
+{% block content %}
+<h1>My Registrations</h1>
+
+<div class="tabs">
+  <a class="tab {% if tab == 'upcoming' %}active{% endif %}" href="?tab=upcoming">Upcoming <small>{{ stats.upcoming|add:stats.waitlisted }}</small></a>
+  <a class="tab {% if tab == 'past' %}active{% endif %}" href="?tab=past">Past events <small>{{ stats.past }}</small></a>
+  <a class="tab {% if tab == 'cancelled' %}active{% endif %}" href="?tab=cancelled">Cancelled <small>{{ stats.cancelled }}</small></a>
+</div>
+
+{% for r in registrations %}
+  {% include "web/partials/registration_card.html" %}
+{% empty %}
+  <div class="empty">
+    <h3>
+      {% if tab == "past" %}No past events yet
+      {% elif tab == "cancelled" %}No cancelled registrations
+      {% else %}You haven't registered for anything yet{% endif %}
+    </h3>
+    <p><a href="{% url 'web:event_list' %}">Browse events</a></p>
+  </div>
+{% endfor %}
+
+{% include "web/partials/pagination.html" %}
+{% endblock %}

@@ -14,4 +14,8 @@ urlpatterns = [
     path("login/", views.SiteLoginView.as_view(), name="login"),
     path("register/", views.register, name="register"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("my-registrations/", views.my_registrations, name="my_registrations"),
+    path("profile/", views.profile, name="profile"),
+    path("profile/password/", views.SitePasswordChangeView.as_view(), name="password_change"),
 ]

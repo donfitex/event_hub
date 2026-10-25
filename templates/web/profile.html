@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<h1>Your profile</h1>
+<section class="auth-box wide">
+  <p class="muted">Signed in as <strong>{{ user.email }}</strong> · {{ user.get_role_display }} · member since {{ user.created_at|date:"F Y" }}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+    {% include "web/partials/field.html" with field=form.first_name %}
+    {% include "web/partials/field.html" with field=form.last_name %}
+    {% include "web/partials/field.html" with field=form.phone %}
+    {% include "web/partials/field.html" with field=form.bio %}
+    <button class="btn btn-primary" type="submit">Save changes</button>
+    <a class="btn btn-ghost" href="{% url 'web:password_change' %}">Change password</a>
+  </form>
+</section>
+{% endblock %}

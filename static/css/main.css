@@ -637,3 +637,128 @@ select:focus {
         position: static;
     }
 }
+
+.muted {
+    color: var(--muted);
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+}
+
+.stat:hover {
+    text-decoration: none;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .08);
+}
+
+.stat strong {
+    font-size: 1.9rem;
+    color: var(--primary);
+}
+
+.stat span {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+.tabs {
+    display: flex;
+    gap: .4rem;
+    border-bottom: 1px solid var(--border);
+    margin: 1rem 0 1.2rem;
+    flex-wrap: wrap;
+}
+
+.tab {
+    padding: .6rem 1rem;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+}
+
+.tab:hover {
+    text-decoration: none;
+    color: var(--text);
+}
+
+.tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tab small {
+    background: #eef2ff;
+    color: var(--primary);
+    padding: .05rem .5rem;
+    border-radius: 999px;
+    margin-left: .3rem;
+}
+
+.reg-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    margin-bottom: .9rem;
+}
+
+.reg-main h3 {
+    margin: 0 0 .3rem;
+}
+
+.reg-main h3 a {
+    color: var(--text);
+}
+
+.reg-meta {
+    margin: 0 0 .6rem;
+    color: var(--muted);
+    font-size: .93rem;
+}
+
+.reg-actions {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.reg-actions form {
+    margin: 0;
+}
+
+.btn-danger {
+    background: #fff;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.btn-danger:hover {
+    background: #fef2f2;
+}
+
+.auth-box.wide {
+    max-width: 560px;
+    margin-left: 0;
+}
+
+.field textarea {
+    width: 100%;
+}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Welcome back, {{ user.first_name }}</h1>
+
+<section class="stats">
+  <a class="stat" href="{% url 'web:my_registrations' %}?tab=upcoming"><strong>{{ stats.upcoming }}</strong><span>Upcoming events</span></a>
+  <a class="stat" href="{% url 'web:my_registrations' %}?tab=upcoming"><strong>{{ stats.waitlisted }}</strong><span>On waitlists</span></a>
+  <a class="stat" href="{% url 'web:my_registrations' %}?tab=past"><strong>{{ stats.past }}</strong><span>Past events</span></a>
+  <a class="stat" href="{% url 'web:my_registrations' %}?tab=cancelled"><strong>{{ stats.cancelled }}</strong><span>Cancelled</span></a>
+</section>
+
+<div class="section-head">
+  <h2>Next up</h2>
+  <a href="{% url 'web:my_registrations' %}">All registrations →</a>
+</div>
+{% for r in next_up %}
+  {% include "web/partials/registration_card.html" %}
+{% empty %}
+  <div class="empty">
+    <h3>No upcoming registrations</h3>
+    <p>Find something to attend on the <a href="{% url 'web:event_list' %}">events page</a>.</p>
+  </div>
+{% endfor %}
+{% endblock %}

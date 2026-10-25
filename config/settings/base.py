@@ -134,5 +134,5 @@ EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "EventHub <noreply@eventhub.local>")
 
 LOGIN_URL = "web:login"
-LOGIN_REDIRECT_URL = "web:home"
+LOGIN_REDIRECT_URL = "web:dashboard"
 LOGOUT_REDIRECT_URL = "web:home"
