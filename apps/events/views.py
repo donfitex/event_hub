@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
+from apps.common.exceptions import DomainError
 from apps.common.permissions import IsAdminRole, IsOrganizerRole
 from apps.registrations.constants import RegistrationStatus
 from apps.registrations.exceptions import RegistrationError
@@ -58,10 +59,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
         try:
             category.delete()
         except ProtectedError:
-            return Response(
-                {"detail": "This category has events and cannot be deleted. Deactivate it instead."},
-                status=status.HTTP_409_CONFLICT,
-            )
+              raise DomainError(
+                  "CATEGORY_IN_USE",
+                  "This category has events and cannot be deleted. Deactivate it instead.",
+                  status.HTTP_409_CONFLICT,
+              )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 def _csv_safe(value):
@@ -132,23 +134,18 @@ class EventViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         event = self.get_object()
         if event.status != EventStatus.DRAFT:
-            return Response(
-                {"detail": "Only draft events can be deleted. Cancel the event instead."},
-                status=status.HTTP_409_CONFLICT,
+            raise DomainError(
+                "EVENT_NOT_DELETABLE",
+                "Only draft events can be deleted. Cancel the event instead.",
+                status.HTTP_409_CONFLICT,
             )
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=True, methods=["post"], url_path="register")
     def register(self, request, pk=None):
-        event = self.get_object()  # drafts stay hidden from non-owners (404)
-        try:
-            registration = register_for_event(request.user, event)
-        except RegistrationError as exc:
-            return Response(
-                {"error": {"code": exc.code, "message": exc.message}},
-                status=exc.status_code,
-            )
+        event = self.get_object()
+        registration = register_for_event(request.user, event)
         data = RegistrationSerializer(
             registration, context=self.get_serializer_context()
         ).data
@@ -201,10 +198,7 @@ class EventViewSet(viewsets.ModelViewSet):
         try:
             change_event_status(event, new_status, request.user)
         except DjangoValidationError as exc:
-            return Response(
-                {"error": {"code": "INVALID_EVENT_STATE", "message": " ".join(exc.messages)}},
-                status=status.HTTP_409_CONFLICT,
-            )
+            raise DomainError("INVALID_EVENT_STATE", " ".join(exc.messages), status.HTTP_409_CONFLICT)
         return Response(self._detail(event))
 
     @action(detail=True, methods=["post"])

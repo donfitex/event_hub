@@ -97,7 +97,7 @@ class EventWriteSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             if self.instance.status in (EventStatus.CANCELLED, EventStatus.COMPLETED):
                 raise serializers.ValidationError(
-                    "Cancelled or completed events cannot be edited."
+                    "Cancelled or completed events cannot be edited.", code="business_rule"
                 )
             candidate = copy.copy(self.instance)
         else:
@@ -110,7 +110,7 @@ class EventWriteSerializer(serializers.ModelSerializer):
         try:
             candidate.clean()
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict)
+            raise serializers.ValidationError(exc.message_dict, code="business_rule")
         return attrs
     
     def update(self, instance, validated_data):

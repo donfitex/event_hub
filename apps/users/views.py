@@ -13,7 +13,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
+from rest_framework import serializers
 
+from apps.common.exceptions import DomainError
 from apps.common.permissions import IsAdminRole
 
 from .serializers import (
@@ -125,13 +127,13 @@ class PasswordResetConfirmView(APIView):
         try:
             user = User.objects.get(pk=force_str(urlsafe_base64_decode(data["uid"])))
         except (User.DoesNotExist, ValueError, TypeError, OverflowError):
-            return Response({"detail": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
+            raise DomainError("INVALID_RESET_LINK", "Invalid reset link.")
         if not default_token_generator.check_token(user, data["token"]):
-            return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+            raise DomainError("INVALID_RESET_TOKEN", "Invalid or expired token.")
         try:
             validate_password(data["new_password"], user)
         except DjangoValidationError as exc:
-            return Response({"new_password": list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
         user.set_password(data["new_password"])
         user.save(update_fields=["password"])
         Token.objects.filter(user=user).delete()

@@ -5,7 +5,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .exceptions import RegistrationError
 from .filters import RegistrationFilter
 from .models import Registration
 from .serializers import RegistrationSerializer
@@ -38,8 +37,6 @@ class RegistrationViewSet(
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         registration = self.get_object()
-        try:
-            registration, _promoted = cancel_registration(registration, request.user)
-        except RegistrationError:
-            registration = self.get_queryset().get(pk=registration.pk)
-            return Response(self.get_serializer(registration).data)
+        registration, _promoted = cancel_registration(registration, request.user)
+        registration = self.get_queryset().get(pk=registration.pk)
+        return Response(self.get_serializer(registration).data)

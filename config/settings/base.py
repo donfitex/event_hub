@@ -118,6 +118,11 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "apps.common.renderers.EnvelopeJSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "EXCEPTION_HANDLER": "apps.common.exceptions.api_exception_handler",
 }
 
 # Shared security settings

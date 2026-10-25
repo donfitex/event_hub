@@ -1,8 +1,5 @@
-class RegistrationError(Exception):
-    """A business-rule failure with a machine-readable code and HTTP status."""
+from apps.common.exceptions import DomainError
 
-    def __init__(self, code, message, status_code=400):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
+
+class RegistrationError(DomainError):
+    """Registration rule failure. Same signature: RegistrationError(code, message, status_code)."""
