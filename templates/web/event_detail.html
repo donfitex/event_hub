@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }}{% endblock %}
+{% block content %}
+<article class="detail-basic">
+  <span class="badge badge-{{ event.state_code }}">{{ event.state_label }}</span>
+  <h1>{{ event.title }}</h1>
+  <p>{{ event.start_datetime|date:"l, j F Y" }} at {{ event.start_datetime|time:"g:i A" }} · {{ event.venue }}, {{ event.location }}</p>
+  <p>{{ event.description|linebreaksbr }}</p>
+  <p><a href="{% url 'web:event_list' %}">← Back to events</a></p>
+</article>
+{% endblock %}

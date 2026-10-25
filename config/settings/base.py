@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.events",
     "apps.registrations",
     "apps.common",
+    "apps.web",
 ]
 
 REGISTRATION_CANCELLATION_CUTOFF_HOURS = int(env("REGISTRATION_CANCELLATION_CUTOFF_HOURS", "0"))
@@ -131,3 +132,7 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "EventHub <noreply@eventhub.local>")
+
+LOGIN_URL = "web:login"
+LOGIN_REDIRECT_URL = "web:home"
+LOGOUT_REDIRECT_URL = "web:home"

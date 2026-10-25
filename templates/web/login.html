@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<section class="auth-box">
+  <h1>Log in</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+    {% include "web/partials/field.html" with field=form.username %}
+    {% include "web/partials/field.html" with field=form.password %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn btn-primary btn-block" type="submit">Log in</button>
+  </form>
+  <p class="auth-alt">New here? <a href="{% url 'web:register' %}">Create an account</a></p>
+</section>
+{% endblock %}

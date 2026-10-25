@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Find your next event</h1>
+  <p>Conferences, workshops, meetups and more. Discover, register and manage everything in one place.</p>
+  <form class="hero-search" action="{% url 'web:event_list' %}" method="get">
+    <input type="search" name="q" placeholder="Search events, venues or cities">
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+</section>
+
+{% if categories %}
+<section>
+  <h2>Browse by category</h2>
+  <div class="chips">
+    {% for c in categories %}
+      <a class="chip chip-link" href="{% url 'web:event_list' %}?category={{ c.slug }}">{{ c.name }} <small>{{ c.upcoming }}</small></a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section>
+  <div class="section-head">
+    <h2>Upcoming events</h2>
+    <a href="{% url 'web:event_list' %}">See all →</a>
+  </div>
+  {% if events %}
+    <div class="grid">{% for event in events %}{% include "web/partials/event_card.html" %}{% endfor %}</div>
+  {% else %}
+    <div class="empty"><h3>No upcoming events yet</h3><p>Check back soon.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

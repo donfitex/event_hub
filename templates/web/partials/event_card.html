@@ -1,0 +1,24 @@
+<article class="card">
+  <a class="card-media" href="{% url 'web:event_detail' event.slug %}">
+    {% if event.image %}
+      <img src="{{ event.image.url }}" alt="" loading="lazy">
+    {% else %}
+      <div class="card-placeholder">{{ event.category.name|default:"Event"|slice:":1" }}</div>
+    {% endif %}
+  </a>
+  <div class="card-body">
+    <div class="card-top">
+      <span class="chip">{{ event.category.name|default:"Uncategorised" }}</span>
+      <span class="badge badge-{{ event.state_code }}">{{ event.state_label }}</span>
+    </div>
+    <h3 class="card-title"><a href="{% url 'web:event_detail' event.slug %}">{{ event.title }}</a></h3>
+    <ul class="meta">
+      <li>📅 {{ event.start_datetime|date:"D, j M Y" }}</li>
+      <li>🕒 {{ event.start_datetime|time:"g:i A" }}</li>
+      <li>📍 {{ event.location }}</li>
+      <li>🎟 {{ event.available_seats }} of {{ event.capacity }} seats left</li>
+      <li>👤 {{ event.organizer.full_name }}</li>
+    </ul>
+    <a class="btn btn-primary btn-block" href="{% url 'web:event_detail' event.slug %}">View Event</a>
+  </div>
+</article>

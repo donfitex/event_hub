@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Events{% endblock %}
+{% block content %}
+<h1>Events</h1>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search events">
+  <select name="category" aria-label="Category">
+    <option value="">All categories</option>
+    {% for c in categories %}
+      <option value="{{ c.slug }}" {% if filters.category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="location" value="{{ filters.location }}" placeholder="Location">
+  <input type="date" name="from" value="{{ filters.from }}" aria-label="From date">
+  <select name="sort" aria-label="Sort">
+    <option value="soonest" {% if filters.sort == "soonest" %}selected{% endif %}>Soonest first</option>
+    <option value="latest" {% if filters.sort == "latest" %}selected{% endif %}>Latest first</option>
+    <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Recently added</option>
+    <option value="title" {% if filters.sort == "title" %}selected{% endif %}>Title A–Z</option>
+  </select>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-ghost" href="{% url 'web:event_list' %}">Reset</a>
+</form>
+
+<p class="result-count">{{ page.paginator.count }} event{{ page.paginator.count|pluralize }} found</p>
+
+{% if events %}
+  <div class="grid">{% for event in events %}{% include "web/partials/event_card.html" %}{% endfor %}</div>
+  {% include "web/partials/pagination.html" %}
+{% else %}
+  <div class="empty"><h3>No events match your filters</h3><p>Try a different search or <a href="{% url 'web:event_list' %}">reset the filters</a>.</p></div>
+{% endif %}
+{% endblock %}
