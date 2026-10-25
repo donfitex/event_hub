@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Q
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -24,10 +25,24 @@ def ensure_event_open_for_registration(event):
     if timezone.now() > event.registration_deadline:
         raise RegistrationError("REGISTRATION_CLOSED", "Registration for this event is closed.", 409)
 
+def get_waitlist_position(registration):
+    """1-based position in the FIFO queue, or None if not waitlisted."""
+    if registration.status != RegistrationStatus.WAITLISTED:
+        return None
+    ahead = (
+        Registration.objects.waitlisted()
+        .filter(event_id=registration.event_id)
+        .filter(
+            Q(registered_at__lt=registration.registered_at)
+            | Q(registered_at=registration.registered_at, id__lt=registration.id)
+        )
+        .count()
+    )
+    return ahead + 1
 
 @transaction.atomic
 def register_for_event(user, event):
-    """Atomically register `user` for `event`, or raise RegistrationError."""
+    """Register user for event (or add to the waitlist if full), atomically."""
     # Lock the event row: concurrent registrations for this event now run one at a time.
     try:
         event = Event.objects.select_for_update().get(pk=event.pk)
@@ -37,20 +52,28 @@ def register_for_event(user, event):
     # Everything below is checked against fresh data while holding the lock.
     ensure_event_open_for_registration(event)
 
-    if Registration.objects.active().filter(user=user, event=event).exists():
+    existing = Registration.objects.active().filter(user=user, event=event).first()
+    if existing:
+        if existing.status == RegistrationStatus.WAITLISTED:
+            raise RegistrationError("ALREADY_WAITLISTED", "You are already on the waitlist for this event.", 409)
         raise RegistrationError("ALREADY_REGISTERED", "You are already registered for this event.", 409)
 
+    # Nobody jumps the queue: fill any free seats from the waitlist first.
+    promote_waitlisted(event)
+
     registered = Registration.objects.registered().filter(event=event).count()
-    if registered >= event.capacity:
-        raise RegistrationError("EVENT_FULL", "This event is full.", 409)
+    status = (
+        RegistrationStatus.REGISTERED
+        if registered < event.capacity
+        else RegistrationStatus.WAITLISTED
+    )
 
     try:
         with transaction.atomic():  # savepoint, so a constraint error doesn't poison the outer transaction
-            return Registration.objects.create(user=user, event=event)
+            return Registration.objects.create(user=user, event=event, status=status)
     except IntegrityError:
         # Last line of defence: the partial unique constraint from Commit 11.
         raise RegistrationError("ALREADY_REGISTERED", "You are already registered for this event.", 409)
-
 
 def cancellation_deadline(event):
     """Last moment a registration for this event can still be cancelled."""

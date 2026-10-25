@@ -1,6 +1,9 @@
 import copy
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+
+from apps.registrations.services import promote_waitlisted
 from rest_framework import serializers
 
 from .constants import EventStatus
@@ -21,13 +24,16 @@ class OrganizerSerializer(serializers.Serializer):
 class _EventAvailabilityMixin(serializers.Serializer):
     registration_count = serializers.SerializerMethodField()
     available_seats = serializers.SerializerMethodField()
+    waitlist_count = serializers.SerializerMethodField()
 
     def get_registration_count(self, obj):
-        # Annotated by the queryset once the registrations app exists (Commit 11).
         return getattr(obj, "registered_count", 0)
 
     def get_available_seats(self, obj):
         return max(obj.capacity - self.get_registration_count(obj), 0)
+
+    def get_waitlist_count(self, obj):
+        return getattr(obj, "waitlisted_count", 0)
 
 
 class EventListSerializer(_EventAvailabilityMixin, serializers.ModelSerializer):
@@ -48,7 +54,8 @@ class EventDetailSerializer(_EventAvailabilityMixin, serializers.ModelSerializer
     organizer = OrganizerSerializer(read_only=True)
     is_registration_open = serializers.BooleanField(read_only=True)
     registration_available = serializers.SerializerMethodField()
-
+    waitlist_available = serializers.SerializerMethodField()
+    
     class Meta:
         model = Event
         fields = [
@@ -56,8 +63,11 @@ class EventDetailSerializer(_EventAvailabilityMixin, serializers.ModelSerializer
             "location", "venue", "start_datetime", "end_datetime",
             "registration_deadline", "capacity", "registration_count",
             "available_seats", "is_registration_open", "registration_available",
-            "status", "image", "created_at", "updated_at",
+            "status", "image", "waitlist_available", "waitlist_count", "created_at", "updated_at",
         ]
+        
+    def get_waitlist_available(self, obj):
+        return obj.is_registration_open and self.get_available_seats(obj) == 0
 
     def get_registration_available(self, obj):
         return obj.is_registration_open and self.get_available_seats(obj) > 0
@@ -98,3 +108,12 @@ class EventWriteSerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message_dict)
         return attrs
+    
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            # Same lock as registration/cancellation, so seats can't be double-filled.
+            Event.objects.select_for_update().get(pk=instance.pk)
+            instance = super().update(instance, validated_data)
+            promote_waitlisted(instance)
+        return instance
+    

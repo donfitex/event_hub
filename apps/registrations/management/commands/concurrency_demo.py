@@ -44,8 +44,7 @@ class Command(BaseCommand):
 
         def attempt(user):
             try:
-                register_for_event(user, event)
-                return "REGISTERED"
+                return register_for_event(user, event).status
             except RegistrationError as exc:
                 return exc.code
             finally:
@@ -54,10 +53,11 @@ class Command(BaseCommand):
         with ThreadPoolExecutor(max_workers=len(users)) as pool:
             results = Counter(pool.map(attempt, users))
 
-        in_db = Registration.objects.registered().filter(event=event).count()
+        registered = Registration.objects.registered().filter(event=event).count()
+        waitlisted = Registration.objects.waitlisted().filter(event=event).count()
         self.stdout.write(f"Event {event.pk}, capacity {event.capacity}")
         self.stdout.write(f"Outcomes: {dict(results)}")
-        self.stdout.write(f"Registered rows in database: {in_db}")
-        ok = in_db == event.capacity
+        self.stdout.write(f"Registered: {registered}, waitlisted: {waitlisted}")
+        ok = registered == event.capacity and registered + waitlisted == len(users)
         style = self.style.SUCCESS if ok else self.style.ERROR
         self.stdout.write(style("PASS: no overbooking" if ok else "FAIL: capacity exceeded"))

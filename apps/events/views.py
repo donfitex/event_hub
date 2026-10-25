@@ -63,7 +63,11 @@ class EventViewSet(viewsets.ModelViewSet):
             registered_count=Count(
                 "registrations",
                 filter=Q(registrations__status=RegistrationStatus.REGISTERED),
-            )
+            ),
+            waitlisted_count=Count(
+                "registrations",
+                filter=Q(registrations__status=RegistrationStatus.WAITLISTED),
+            ),
         )
         user = self.request.user
         if user.is_authenticated and user.is_admin_role:
