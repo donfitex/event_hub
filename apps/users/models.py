@@ -72,3 +72,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     @property
     def is_admin_role(self):
         return self.role == Role.ADMIN
+    
+class Organizer(User):
+    """Proxy so organizers get their own admin section."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "organizer"
+        verbose_name_plural = "organizers"
