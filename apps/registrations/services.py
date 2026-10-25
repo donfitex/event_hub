@@ -136,3 +136,17 @@ def cancel_registration(registration, cancelled_by):
 
     promoted = promote_waitlisted(event) if freed_seat else []
     return registration, promoted
+
+def cancel_all_registrations(event):
+    """Cancel every active registration of an event. Call while holding the event lock.
+
+    Returns the registrations that were cancelled.
+    """
+    affected = list(Registration.objects.active().filter(event=event).select_related("user"))
+    now = timezone.now()
+    Registration.objects.filter(pk__in=[r.pk for r in affected]).update(
+        status=RegistrationStatus.CANCELLED,
+        cancelled_at=now,
+        updated_at=now,
+    )
+    return affected

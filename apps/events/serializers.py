@@ -2,8 +2,7 @@ import copy
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-
-from apps.registrations.services import promote_waitlisted
+from apps.registrations.services import cancel_all_registrations, promote_waitlisted
 from rest_framework import serializers
 
 from .constants import EventStatus
@@ -48,6 +47,11 @@ class EventListSerializer(_EventAvailabilityMixin, serializers.ModelSerializer):
             "status", "image",
         ]
 
+class OrganizerEventSerializer(EventListSerializer):
+    class Meta(EventListSerializer.Meta):
+        fields = EventListSerializer.Meta.fields + [
+            "registration_deadline", "registration_count", "waitlist_count",
+        ]
 
 class EventDetailSerializer(_EventAvailabilityMixin, serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
@@ -111,9 +115,11 @@ class EventWriteSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         with transaction.atomic():
-            # Same lock as registration/cancellation, so seats can't be double-filled.
             Event.objects.select_for_update().get(pk=instance.pk)
+            previous_status = instance.status
             instance = super().update(instance, validated_data)
+            if instance.status == EventStatus.CANCELLED and previous_status != EventStatus.CANCELLED:
+                cancel_all_registrations(instance)
             promote_waitlisted(instance)
         return instance
     

@@ -1,9 +1,10 @@
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from apps.registrations.services import cancel_all_registrations
 
+from .constants import EventStatus
 from .models import Event
 from .validators import user_can_manage_event, validate_status_transition
-
 
 @transaction.atomic
 def change_event_status(event, new_status, user):
@@ -17,4 +18,7 @@ def change_event_status(event, new_status, user):
     event.status = new_status
     event.full_clean()
     event.save(update_fields=["status", "updated_at"])
+
+    if new_status == EventStatus.CANCELLED:
+        cancel_all_registrations(event)
     return event

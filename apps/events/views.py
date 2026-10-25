@@ -1,3 +1,14 @@
+import csv
+
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
+from django.utils import timezone
+
+from apps.registrations.serializers import AttendeeSerializer, RegistrationSerializer
+
+from .serializers import OrganizerEventSerializer  # add to the existing serializers import
+from .services import change_event_status
+
 from django.db.models import ProtectedError
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -53,6 +64,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+def _csv_safe(value):
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
 class EventViewSet(viewsets.ModelViewSet):
     filterset_class = EventFilter
     search_fields = ["title", "description", "venue", "location", "category__name"]
@@ -97,6 +112,7 @@ class EventViewSet(viewsets.ModelViewSet):
         return EventListSerializer
 
     def _detail(self, event):
+        event = self.get_queryset().get(pk=event.pk)
         return EventDetailSerializer(event, context=self.get_serializer_context()).data
 
     def create(self, request, *args, **kwargs):
@@ -138,19 +154,97 @@ class EventViewSet(viewsets.ModelViewSet):
         ).data
         return Response(data, status=status.HTTP_201_CREATED)
     
-    @action(detail=True, methods=["get"], url_path="registrations")
-    def registrations(self, request, pk=None):
-        event = self.get_object()  # organizer role + ownership checked via get_permissions
+    def _attendees(self, request, event):
         qs = (
             Registration.objects.filter(event=event)
-            .select_related("event", "user")
+            .select_related("user")
             .order_by("registered_at", "id")
         )
         status_param = request.query_params.get("registration_status")
         if status_param:
             qs = qs.filter(status=status_param.upper())
-        page = self.paginate_queryset(qs)
-        data = RegistrationSerializer(
+        term = request.query_params.get("attendee", "").strip()
+        if term:
+            qs = qs.filter(
+                Q(user__email__icontains=term)
+                | Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+                | Q(user__phone__icontains=term)
+            )
+        return qs
+
+    @action(detail=True, methods=["get"], url_path="registrations")
+    def registrations(self, request, pk=None):
+        event = self.get_object()
+        page = self.paginate_queryset(self._attendees(request, event))
+        return self.get_paginated_response(AttendeeSerializer(page, many=True).data)
+
+    @action(detail=True, methods=["get"], url_path="registrations/export")
+    def export_registrations(self, request, pk=None):
+        event = self.get_object()
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{event.slug}-attendees.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            ["Registration ID", "Status", "Full name", "Email", "Phone", "Registered at", "Cancelled at"]
+        )
+        for r in self._attendees(request, event).iterator():
+            row = [
+                r.id, r.status, r.user.full_name, r.user.email, r.user.phone,
+                r.registered_at.isoformat(),
+                r.cancelled_at.isoformat() if r.cancelled_at else "",
+            ]
+            writer.writerow([_csv_safe(v) for v in row])
+        return response
+
+    def _transition(self, request, event, new_status):
+        try:
+            change_event_status(event, new_status, request.user)
+        except DjangoValidationError as exc:
+            return Response(
+                {"error": {"code": "INVALID_EVENT_STATE", "message": " ".join(exc.messages)}},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(self._detail(event))
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        return self._transition(request, self.get_object(), EventStatus.PUBLISHED)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_event(self, request, pk=None):
+        return self._transition(request, self.get_object(), EventStatus.CANCELLED)
+
+    @action(detail=False, methods=["get"], url_path="mine")
+    def mine(self, request):
+        qs = self.get_queryset()
+        if not request.user.is_admin_role:
+            qs = qs.filter(organizer=request.user)
+        page = self.paginate_queryset(self.filter_queryset(qs))
+        data = OrganizerEventSerializer(
             page, many=True, context=self.get_serializer_context()
         ).data
         return self.get_paginated_response(data)
+
+    @action(detail=False, methods=["get"], url_path="dashboard")
+    def dashboard(self, request):
+        events = (
+            Event.objects.all()
+            if request.user.is_admin_role
+            else Event.objects.filter(organizer=request.user)
+        )
+        now = timezone.now()
+        stats = events.aggregate(
+            total_events=Count("id"),
+            upcoming_events=Count(
+                "id", filter=Q(status=EventStatus.PUBLISHED, start_datetime__gte=now)
+            ),
+            published_events=Count("id", filter=Q(status=EventStatus.PUBLISHED)),
+            completed_events=Count("id", filter=Q(status=EventStatus.COMPLETED)),
+            draft_events=Count("id", filter=Q(status=EventStatus.DRAFT)),
+            cancelled_events=Count("id", filter=Q(status=EventStatus.CANCELLED)),
+        )
+        registrations = Registration.objects.filter(event__in=events)
+        stats["total_registrations"] = registrations.registered().count()
+        stats["waitlisted_registrations"] = registrations.waitlisted().count()
+        return Response(stats)

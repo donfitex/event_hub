@@ -39,3 +39,18 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def get_waitlist_position(self, obj):
         return waitlist_position_for(obj)
     
+    
+class AttendeeUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    email = serializers.EmailField()
+    phone = serializers.CharField()
+
+
+class AttendeeSerializer(serializers.ModelSerializer):
+    user = AttendeeUserSerializer(read_only=True)
+
+    class Meta:
+        model = Registration
+        fields = ["id", "status", "registered_at", "cancelled_at", "user"]
+        read_only_fields = fields
