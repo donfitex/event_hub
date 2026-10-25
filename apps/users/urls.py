@@ -1,5 +1,7 @@
 from django.urls import path
 
+from rest_framework.routers import DefaultRouter
+
 from . import views
 
 app_name = "users"
@@ -14,3 +16,8 @@ urlpatterns = [
     path("password-reset/confirm/", views.PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("state/", views.AuthStateView.as_view(), name="auth-state"),
 ]
+
+router = DefaultRouter()
+router.register("manage", views.UserManagementViewSet, basename="user-management")
+
+urlpatterns += router.urls

@@ -8,10 +8,13 @@ from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import generics, status
+from rest_framework import generics, status, mixins, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
+
+from apps.common.permissions import IsAdminRole
 
 from .serializers import (
     ChangePasswordSerializer,
@@ -21,6 +24,7 @@ from .serializers import (
     ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
+    AdminUserSerializer,
 )
 
 User = get_user_model()
@@ -44,14 +48,15 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        login(request, user)
-        return Response(UserSerializer(user).data)
-
+        login(request, user)  # keeps the browsable API working
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({"token": token.key, "user": UserSerializer(user).data})
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        Token.objects.filter(user=request.user).delete()
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -83,10 +88,11 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=["password"])
-        update_session_auth_hash(request, request.user)  # keep the user logged in
-        return Response({"detail": "Password changed successfully."})
-
-
+        update_session_auth_hash(request, request.user)
+        Token.objects.filter(user=request.user).delete()  # old tokens die with the old password
+        token = Token.objects.create(user=request.user)
+        return Response({"detail": "Password changed successfully.", "token": token.key})
+    
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
@@ -128,6 +134,7 @@ class PasswordResetConfirmView(APIView):
             return Response({"new_password": list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
         user.set_password(data["new_password"])
         user.save(update_fields=["password"])
+        Token.objects.filter(user=user).delete()
         return Response({"detail": "Password has been reset."})
 
 
@@ -141,3 +148,24 @@ class AuthStateView(APIView):
         if request.user.is_authenticated:
             return Response({"authenticated": True, "user": UserSerializer(request.user).data})
         return Response({"authenticated": False, "user": None})
+    
+
+class UserManagementViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Admin-only: list users, change roles, activate/deactivate accounts."""
+
+    queryset = User.objects.all().order_by("-created_at")
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminRole]
+    filterset_fields = ["role", "is_active"]
+    search_fields = ["email", "first_name", "last_name"]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def perform_update(self, serializer):
+        user = serializer.save()
+        if not user.is_active:
+            Token.objects.filter(user=user).delete()

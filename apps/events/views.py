@@ -9,6 +9,7 @@ from apps.registrations.constants import RegistrationStatus
 from apps.registrations.exceptions import RegistrationError
 from apps.registrations.serializers import RegistrationSerializer
 from apps.registrations.services import register_for_event
+from apps.registrations.models import Registration
 from django.db.models import Count, Q
 
 from .constants import EventStatus
@@ -136,3 +137,20 @@ class EventViewSet(viewsets.ModelViewSet):
             registration, context=self.get_serializer_context()
         ).data
         return Response(data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=["get"], url_path="registrations")
+    def registrations(self, request, pk=None):
+        event = self.get_object()  # organizer role + ownership checked via get_permissions
+        qs = (
+            Registration.objects.filter(event=event)
+            .select_related("event", "user")
+            .order_by("registered_at", "id")
+        )
+        status_param = request.query_params.get("registration_status")
+        if status_param:
+            qs = qs.filter(status=status_param.upper())
+        page = self.paginate_queryset(qs)
+        data = RegistrationSerializer(
+            page, many=True, context=self.get_serializer_context()
+        ).data
+        return self.get_paginated_response(data)

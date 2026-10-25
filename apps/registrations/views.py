@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -23,10 +25,15 @@ class RegistrationViewSet(
     ordering = ["-registered_at"]
 
     def get_queryset(self):
-        # Users only ever see their own registrations.
-        return Registration.objects.filter(user=self.request.user).select_related(
-            "event", "user"
-        )
+        user = self.request.user
+        qs = Registration.objects.select_related("event", "user")
+        if self.action == "list":
+            return qs.filter(user=user)  # "my registrations" stays personal
+        if user.is_admin_role:
+            return qs
+        if user.is_organizer:
+            return qs.filter(Q(user=user) | Q(event__organizer=user))
+        return qs.filter(user=user)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):

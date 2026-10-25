@@ -81,3 +81,24 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(write_only=True)
+    
+    
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id", "email", "first_name", "last_name", "phone",
+            "role", "is_active", "created_at",
+        ]
+        read_only_fields = ["id", "email", "first_name", "last_name", "phone", "created_at"]
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        if self.instance and self.instance == request.user:
+            changing_role = "role" in attrs and attrs["role"] != self.instance.role
+            deactivating = attrs.get("is_active") is False
+            if changing_role or deactivating:
+                raise serializers.ValidationError(
+                    "You cannot change your own role or deactivate your own account."
+                )
+        return attrs
