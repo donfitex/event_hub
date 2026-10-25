@@ -38,6 +38,7 @@ class Registration(models.Model):
 
     objects = RegistrationQuerySet.as_manager()
 
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     class Meta:
         ordering = ["-registered_at"]
         indexes = [

@@ -9,6 +9,7 @@ from apps.events.constants import EventStatus
 from apps.events.models import Event
 from apps.events.validators import user_can_manage_event
 
+from . import notifications
 from .constants import RegistrationStatus
 from .exceptions import RegistrationError
 from .models import Registration
@@ -70,10 +71,19 @@ def register_for_event(user, event):
 
     try:
         with transaction.atomic():  # savepoint, so a constraint error doesn't poison the outer transaction
-            return Registration.objects.create(user=user, event=event, status=status)
+            registration = Registration.objects.create(user=user, event=event, status=status)
     except IntegrityError:
-        # Last line of defence: the partial unique constraint from Commit 11.
         raise RegistrationError("ALREADY_REGISTERED", "You are already registered for this event.", 409)
+
+    if status == RegistrationStatus.WAITLISTED:
+        transaction.on_commit(
+            lambda: notifications.send_waitlist_joined(
+                registration, get_waitlist_position(registration)
+            )
+        )
+    else:
+        transaction.on_commit(lambda: notifications.send_registration_confirmed(registration))
+    return registration
 
 def cancellation_deadline(event):
     """Last moment a registration for this event can still be cancelled."""
@@ -105,6 +115,8 @@ def promote_waitlisted(event):
     for registration in queue:
         registration.status = RegistrationStatus.REGISTERED
         registration.save(update_fields=["status", "updated_at"])
+    if queue:
+        transaction.on_commit(lambda: notifications.send_waitlist_promoted(event, queue))
     return queue
 
 
@@ -133,7 +145,10 @@ def cancel_registration(registration, cancelled_by):
     registration.status = RegistrationStatus.CANCELLED
     registration.cancelled_at = timezone.now()
     registration.save(update_fields=["status", "cancelled_at", "updated_at"])
-
+    by_staff = registration.user_id != cancelled_by.id
+    transaction.on_commit(
+        lambda: notifications.send_registration_cancelled(registration, event, by_staff)
+    )
     promoted = promote_waitlisted(event) if freed_seat else []
     return registration, promoted
 
@@ -149,4 +164,6 @@ def cancel_all_registrations(event):
         cancelled_at=now,
         updated_at=now,
     )
+    if affected:
+        transaction.on_commit(lambda: notifications.send_event_cancelled(event, affected))
     return affected

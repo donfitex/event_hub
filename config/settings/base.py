@@ -136,3 +136,6 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "EventHub <noreply@eventhub.local
 LOGIN_URL = "web:login"
 LOGIN_REDIRECT_URL = "web:dashboard"
 LOGOUT_REDIRECT_URL = "web:home"
+
+SITE_URL = env("SITE_URL", "http://127.0.0.1:8000").rstrip("/")
+EMAIL_TIMEOUT = 10

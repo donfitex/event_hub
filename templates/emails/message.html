@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center" style="padding:24px 12px;">
+  <table cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;">
+    <tr><td style="padding:20px 28px;border-bottom:1px solid #e2e8f0;font-size:20px;font-weight:bold;">Event<span style="color:#4f46e5;">Hub</span></td></tr>
+    <tr><td style="padding:24px 28px;">
+      <h1 style="margin:0 0 12px;font-size:22px;">{{ heading }}</h1>
+      <p>Hi {{ name }},</p>
+      {% for p in paragraphs %}<p style="line-height:1.5;">{{ p }}</p>{% endfor %}
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f1f5f9;border-radius:8px;margin:16px 0;">
+        <tr><td style="padding:14px 16px;font-size:14px;line-height:1.7;">
+          <strong>{{ event.title }}</strong><br>
+          📅 {{ event.start_datetime|date:"l, j F Y" }} · {{ event.start_datetime|time:"g:i A" }}<br>
+          📍 {{ event.venue }}, {{ event.location }}
+        </td></tr>
+      </table>
+      <a href="{{ cta_url }}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">{{ cta_label }}</a>
+    </td></tr>
+    <tr><td style="padding:16px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">You received this email because of activity on your EventHub account.</td></tr>
+  </table>
+</td></tr></table>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ name }},
+
+{% for p in paragraphs %}{{ p }}
+
+{% endfor %}{{ event.title }}
+When:  {{ event.start_datetime|date:"l, j F Y, g:i A" }}
+Where: {{ event.venue }}, {{ event.location }}
+
+{{ cta_label }}: {{ cta_url }}
+
+The EventHub team
+{% endautoescape %}
