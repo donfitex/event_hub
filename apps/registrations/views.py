@@ -32,11 +32,7 @@ class RegistrationViewSet(
     def cancel(self, request, pk=None):
         registration = self.get_object()
         try:
-            registration = cancel_registration(registration)
-        except RegistrationError as exc:
-            return Response(
-                {"error": {"code": exc.code, "message": exc.message}},
-                status=exc.status_code,
-            )
-        registration = self.get_queryset().get(pk=registration.pk)
-        return Response(self.get_serializer(registration).data)
+            registration, _promoted = cancel_registration(registration, request.user)
+        except RegistrationError:
+            registration = self.get_queryset().get(pk=registration.pk)
+            return Response(self.get_serializer(registration).data)

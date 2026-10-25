@@ -5,7 +5,7 @@ from django.utils import timezone
 from apps.events.models import Event
 
 from .models import Registration
-
+from .services import cancellation_deadline
 
 class RegistrationEventSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,6 +32,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_can_cancel(self, obj):
-        return obj.is_active and obj.event.start_datetime > timezone.now()
+        def get_can_cancel(self, obj):
+            return obj.is_active and timezone.now() < cancellation_deadline(obj.event)
     

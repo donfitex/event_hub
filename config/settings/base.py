@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     "apps.common",
 ]
 
+REGISTRATION_CANCELLATION_CUTOFF_HOURS = int(env("REGISTRATION_CANCELLATION_CUTOFF_HOURS", "0"))
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
