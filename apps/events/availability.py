@@ -10,6 +10,8 @@ from .constants import EventStatus
 def availability_state(event, registered_count, user_status=None):
     """Return (code, label) describing what a visitor can do with this event."""
     now = timezone.now()
+    if event.status == EventStatus.DRAFT:
+        return "draft", "Draft"
     if event.status == EventStatus.CANCELLED:
         return "cancelled", "Cancelled"
     if event.status == EventStatus.COMPLETED or event.end_datetime <= now:

@@ -499,3 +499,141 @@ select:focus {
         flex-direction: column;
     }
 }
+
+.breadcrumb {
+    margin: 1.2rem 0 .5rem;
+}
+
+.detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 2rem;
+    align-items: start;
+    margin-bottom: 2rem;
+}
+
+.detail-media {
+    aspect-ratio: 16 / 7;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+    background: #e0e7ff;
+}
+
+.detail-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.prose p {
+    margin: 0 0 1rem;
+}
+
+.organizer {
+    display: flex;
+    gap: .8rem;
+    align-items: center;
+}
+
+.avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.detail-side {
+    position: sticky;
+    top: 84px;
+}
+
+.side-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+}
+
+.facts {
+    margin: 0 0 1rem;
+}
+
+.facts dt {
+    color: var(--muted);
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-top: .8rem;
+}
+
+.facts dd {
+    margin: .1rem 0 0;
+    font-weight: 500;
+}
+
+.seats {
+    margin: 1rem 0;
+}
+
+.seats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: .3rem;
+}
+
+.bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.bar span {
+    display: block;
+    height: 100%;
+    background: var(--primary);
+}
+
+.side-action {
+    margin-top: 1rem;
+}
+
+.notice {
+    padding: .7rem 1rem;
+    border-radius: 8px;
+    margin: 0 0 .8rem;
+    font-weight: 600;
+}
+
+.notice-ok {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn:disabled {
+    background: #e2e8f0;
+    color: #64748b;
+    cursor: not-allowed;
+}
+
+.badge-draft {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+@media (max-width: 860px) {
+    .detail {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-side {
+        position: static;
+    }
+}

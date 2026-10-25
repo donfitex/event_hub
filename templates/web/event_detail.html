@@ -1,11 +1,97 @@
 {% extends "base.html" %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
-<article class="detail-basic">
-  <span class="badge badge-{{ event.state_code }}">{{ event.state_label }}</span>
-  <h1>{{ event.title }}</h1>
-  <p>{{ event.start_datetime|date:"l, j F Y" }} at {{ event.start_datetime|time:"g:i A" }} · {{ event.venue }}, {{ event.location }}</p>
-  <p>{{ event.description|linebreaksbr }}</p>
-  <p><a href="{% url 'web:event_list' %}">← Back to events</a></p>
-</article>
+<p class="breadcrumb"><a href="{% url 'web:event_list' %}">← All events</a></p>
+
+{% if event.status == "DRAFT" %}
+  <div class="alert alert-warning">Draft preview. Only you and admins can see this page.</div>
+{% endif %}
+
+<div class="detail">
+  <div class="detail-main">
+    <div class="detail-media">
+      {% if event.image %}
+        <img src="{{ event.image.url }}" alt="{{ event.title }}">
+      {% else %}
+        <div class="card-placeholder">{{ event.category.name|default:"Event"|slice:":1" }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card-top">
+      <span class="chip">{{ event.category.name|default:"Uncategorised" }}</span>
+      <span class="badge badge-{{ state_code }}">{{ state_label }}</span>
+    </div>
+    <h1>{{ event.title }}</h1>
+
+    <h2>About this event</h2>
+    <div class="prose">{{ event.description|linebreaks }}</div>
+
+    <h2>Organizer</h2>
+    <div class="organizer">
+      <div class="avatar">{{ event.organizer.first_name|slice:":1" }}</div>
+      <div><strong>{{ event.organizer.full_name }}</strong><br><small>Event organizer</small></div>
+    </div>
+  </div>
+
+  <aside class="detail-side">
+    <div class="side-card">
+      <dl class="facts">
+        <dt>Date</dt>
+        <dd>{{ event.start_datetime|date:"l, j F Y" }}{% if multi_day %} – {{ event.end_datetime|date:"l, j F Y" }}{% endif %}</dd>
+        <dt>Time</dt>
+        <dd>{{ event.start_datetime|time:"g:i A" }} – {{ event.end_datetime|time:"g:i A" }}</dd>
+        <dt>Venue</dt>
+        <dd>{{ event.venue }}</dd>
+        <dt>Location</dt>
+        <dd>{{ event.location }}</dd>
+        <dt>Registration deadline</dt>
+        <dd>
+          {{ event.registration_deadline|date:"D, j M Y, g:i A" }}
+          {% if registration_open %}<br><small>Closes in {{ event.registration_deadline|timeuntil }}</small>{% endif %}
+        </dd>
+        <dt>Capacity</dt>
+        <dd>{{ event.capacity }} people</dd>
+      </dl>
+
+      <div class="seats">
+        <div class="seats-row"><span>Seats left</span><strong>{{ available_seats }}</strong></div>
+        <div class="bar" role="progressbar" aria-valuenow="{{ fill_percent }}" aria-valuemin="0" aria-valuemax="100">
+          <span style="width: {{ fill_percent }}%"></span>
+        </div>
+      </div>
+
+      <div class="side-action">
+        {% if registration %}
+          <p class="notice notice-ok">
+            {% if registration.status == "REGISTERED" %}✓ You're registered for this event.
+            {% else %}You're on the waitlist, position {{ waitlist_position }}.{% endif %}
+          </p>
+          <form method="post" action="{% url 'web:registration_cancel' registration.pk %}"
+                onsubmit="return confirm('Are you sure?');">
+            {% csrf_token %}
+            <button class="btn btn-ghost btn-block" type="submit">
+              {% if registration.status == "REGISTERED" %}Cancel registration{% else %}Leave waitlist{% endif %}
+            </button>
+          </form>
+        {% elif registration_open %}
+          {% if not user.is_authenticated %}
+            <a class="btn btn-primary btn-block" href="{% url 'web:login' %}?next={{ request.path|urlencode }}">Log in to register</a>
+          {% else %}
+            <form method="post" action="{% url 'web:event_register' event.slug %}">
+              {% csrf_token %}
+              <button class="btn btn-primary btn-block" type="submit">
+                {% if available_seats > 0 %}Register now{% else %}Join the waitlist{% endif %}
+              </button>
+            </form>
+            {% if available_seats == 0 %}
+              <p class="help">This event is full. You will join the waitlist and be promoted automatically if a seat opens up.</p>
+            {% endif %}
+          {% endif %}
+        {% else %}
+          <button class="btn btn-block" type="button" disabled>{{ state_label }}</button>
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+</div>
 {% endblock %}

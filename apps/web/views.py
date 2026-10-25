@@ -1,11 +1,23 @@
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login
-from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.contrib.auth.views import LoginView, redirect_to_login
+from django.http import Http404
+from django.views.decorators.http import require_POST
+
+from apps.events.validators import user_can_manage_event
+from apps.registrations.exceptions import RegistrationError
+from apps.registrations.models import Registration
+from apps.registrations.services import (
+    cancel_registration,
+    get_waitlist_position,
+    register_for_event,
+)
 
 from apps.events.availability import availability_state
 from apps.events.constants import EventStatus
@@ -103,11 +115,77 @@ def event_list(request):
 
 
 def event_detail(request, slug):
-    """Minimal page for now; Commit 21 builds the full experience."""
-    event = get_object_or_404(_with_counts(Event.objects.exclude(status=EventStatus.DRAFT)), slug=slug)
-    event = decorate([event])[0]
-    return render(request, "web/event_detail.html", {"event": event})
+    event = get_object_or_404(_with_counts(Event.objects.all()), slug=slug)
+    can_manage = user_can_manage_event(request.user, event)
+    if event.status == EventStatus.DRAFT and not can_manage:
+        raise Http404  # drafts are visible only to the organizer and admins
 
+    registration = None
+    if request.user.is_authenticated:
+        registration = (
+            Registration.objects.active().filter(user=request.user, event=event).first()
+        )
+
+    registered = event.registered_count
+    state_code, state_label = availability_state(
+        event, registered, registration.status if registration else None
+    )
+    now = timezone.now()
+    start, end = timezone.localtime(event.start_datetime), timezone.localtime(event.end_datetime)
+
+    context = {
+        "event": event,
+        "state_code": state_code,
+        "state_label": state_label,
+        "available_seats": max(event.capacity - registered, 0),
+        "fill_percent": min(100, round(registered * 100 / event.capacity)),
+        "registration": registration,
+        "waitlist_position": get_waitlist_position(registration) if registration else None,
+        "registration_open": event.status == EventStatus.PUBLISHED and now <= event.registration_deadline,
+        "multi_day": start.date() != end.date(),
+        "can_manage": can_manage,
+    }
+    return render(request, "web/event_detail.html", context)
+
+
+@require_POST
+def event_register(request, slug):
+    event = get_object_or_404(Event.objects.exclude(status=EventStatus.DRAFT), slug=slug)
+    detail_url = reverse("web:event_detail", args=[slug])
+    if not request.user.is_authenticated:
+        return redirect_to_login(detail_url)
+
+    try:
+        registration = register_for_event(request.user, event)
+    except RegistrationError as exc:
+        messages.error(request, exc.message)
+    else:
+        if registration.status == RegistrationStatus.WAITLISTED:
+            position = get_waitlist_position(registration)
+            messages.info(request, f"This event is full. You are number {position} on the waitlist.")
+        else:
+            messages.success(request, "You're registered! See you there.")
+    return redirect(detail_url)
+
+
+@require_POST
+def registration_cancel(request, pk):
+    if not request.user.is_authenticated:
+        return redirect_to_login(reverse("web:home"))
+    registration = get_object_or_404(
+        Registration.objects.select_related("event"), pk=pk, user=request.user
+    )
+    was_waitlisted = registration.status == RegistrationStatus.WAITLISTED
+    try:
+        cancel_registration(registration, request.user)
+    except RegistrationError as exc:
+        messages.error(request, exc.message)
+    else:
+        messages.success(
+            request,
+            "You have left the waitlist." if was_waitlisted else "Your registration has been cancelled.",
+        )
+    return redirect("web:event_detail", slug=registration.event.slug)
 
 def register(request):
     if request.user.is_authenticated:
