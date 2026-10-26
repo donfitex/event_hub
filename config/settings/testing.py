@@ -7,3 +7,5 @@ SECRET_KEY = SECRET_KEY or "test-secret-key-not-for-production"
 # Faster tests
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+SITE_URL = "http://testserver"
