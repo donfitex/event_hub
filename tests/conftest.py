@@ -1,6 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
+from tests.factories.users import DEFAULT_PASSWORD
 from tests.factories import (
     AdminFactory, CategoryFactory, EventFactory, OrganizerFactory, UserFactory,
 )
@@ -49,6 +50,24 @@ def auth_client():
     def _make(user):
         client = APIClient()
         client.force_authenticate(user=user)
+        return client
+
+    return _make
+
+
+
+@pytest.fixture
+def token_client():
+    """Logs in through the real endpoint and returns a client sending the real token."""
+
+    def _make(user, password=DEFAULT_PASSWORD):
+        login = APIClient().post(
+            "/api/v1/users/login/", {"email": user.email, "password": password}, format="json"
+        )
+        assert login.status_code == 200, login.content
+        client = APIClient()
+        client.token = login.json()["data"]["token"]
+        client.credentials(HTTP_AUTHORIZATION=f"Token {client.token}")
         return client
 
     return _make

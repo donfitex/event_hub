@@ -106,6 +106,14 @@ class EventWriteSerializer(serializers.ModelSerializer):
         for field, value in attrs.items():
             setattr(candidate, field, value)
 
+        if self.instance is None and attrs.get("status", EventStatus.DRAFT) not in (
+            EventStatus.DRAFT,
+            EventStatus.PUBLISHED,
+        ):
+            raise serializers.ValidationError(
+                {"status": "New events can only be created as draft or published."},
+                code="business_rule",
+            )
         # Reuse the model rules from Commit 08 (dates, transitions, publishing).
         try:
             candidate.clean()
